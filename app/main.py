@@ -1,7 +1,5 @@
 import logging
 from fastapi import FastAPI, Request, Header, HTTPException
-import os
-import environ
 from app.config import TELEGRAM_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN
 
 logging.basicConfig(level=logging.INFO)
