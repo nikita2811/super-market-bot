@@ -1,15 +1,18 @@
 import logging
+import httpx
 from fastapi import FastAPI, Request, Header, HTTPException
 from app.config import TELEGRAM_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN
+from app.db import SessionLocal
+from app.model import ProcessedUpdate
+from app.bot import handle_telegram_message  # the function from agent.py/bot.py
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("super-market-bot")
 
 app = FastAPI()
 
-
-
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_BOT_TOKEN}"
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 
 @app.post(WEBHOOK_PATH)
@@ -21,11 +24,37 @@ async def telegram_webhook(
         raise HTTPException(status_code=401, detail="Invalid secret token")
 
     update = await request.json()
-    message = update.get("message")
+    update_id = str(update.get("update_id"))
 
+   
+    db = SessionLocal()
+    try:
+        already_seen = db.query(ProcessedUpdate).filter(
+            ProcessedUpdate.update_id == update_id
+        ).first()
+        if already_seen:
+            logger.info(f"Duplicate update {update_id}, skipping")
+            return {"ok": True}
+
+        db.add(ProcessedUpdate(update_id=update_id))
+        db.commit()
+    finally:
+        db.close()
+
+    message = update.get("message")
     if message and "text" in message:
-        chat_id = message["chat"]["id"]
+        chat_id = str(message["chat"]["id"])
         text = message["text"]
         logger.info(f"Message from {chat_id}: {text}")
 
-    return {"ok": True}  # respond fast so Telegram doesn't retry
+        # Run the agent and get its reply
+        reply_text = await handle_telegram_message(chat_id, text)
+
+        # Send the reply back to Telegram
+        async with httpx.AsyncClient() as http_client:
+            await http_client.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": reply_text},
+            )
+
+    return {"ok": True}
