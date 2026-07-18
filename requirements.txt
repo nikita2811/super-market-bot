@@ -11,3 +11,5 @@ matplotlib==3.9.2
 pydantic==2.9.2
 alembic
 claude-agent-sdk
+deepagents
+langchain-google-genai
