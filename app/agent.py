@@ -1,20 +1,11 @@
-from claude_agent_sdk import create_sdk_mcp_server, ClaudeAgentOptions, ClaudeSDKClient
-from app.tools.product_tools import create_product
-# from app.tools.billing import add_bill_item, finalize_bill  # etc, as you build them
+from deepagents import create_deep_agent
+from app.tools.products import create_product, get_stock_level
+# from app.tools.billing import add_bill_item, finalize_bill  # as you build more
 
-server = create_sdk_mcp_server(
-    name="super-market-tools",
-    version="1.0.0",
-    tools=[create_product] 
-)
-
-def build_agent_options() -> ClaudeAgentOptions:
-    return ClaudeAgentOptions(
-        mcp_servers={"super-market-tools": server},
-        allowed_tools=[
-            "mcp__super-market-tools__create_product",
-            
-        ],
+def build_agent():
+    return create_deep_agent(
+        model="google_genai:gemini-3-flash",  # free-tier-eligible model
+        tools=[create_product, get_stock_level],
         system_prompt=(
             "You run a super market store's operations via chat. "
             "Always use tools for prices, stock, and GST — never invent numbers. "
