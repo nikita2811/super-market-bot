@@ -1,6 +1,6 @@
 from deepagents import create_deep_agent
-from app.tools.products import create_product, get_stock_level
-# from app.tools.billing import add_bill_item, finalize_bill  # as you build more
+from app.tools.product_tools import create_product, get_stock_level
+
 
 def build_agent():
     return create_deep_agent(
