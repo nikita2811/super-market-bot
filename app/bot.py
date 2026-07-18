@@ -1,9 +1,9 @@
 from app.agent import build_agent
 
-agent = build_agent()  # can be built once and reused across chats
+agent = build_agent() 
 
-# app/bot.py
-def handle_telegram_message(chat_id: str, text: str) -> str:
+
+async def handle_telegram_message(chat_id: str, text: str) -> str:
     result = agent.invoke({"messages": [{"role": "user", "content": text}]})
     content = result["messages"][-1].content
 
