@@ -54,7 +54,7 @@ async def telegram_webhook(
         async with httpx.AsyncClient() as http_client:
             await http_client.post(
                 f"{TELEGRAM_API}/sendMessage",
-                json={"chat_id": chat_id, "text": reply_text},
+                json={"chat_id": chat_id, "text": reply_text["text"]},
             )
 
     return {"ok": True}
