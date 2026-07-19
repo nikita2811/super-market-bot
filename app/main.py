@@ -3,7 +3,7 @@ import httpx
 from fastapi import FastAPI, Request, Header, HTTPException
 from app.config import TELEGRAM_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN
 from app.db import SessionLocal
-from app.model import ProcessedUpdate
+from app.model import ProcessedUpdate,ChatSession
 from app.bot import handle_telegram_message  # the function from agent.py/bot.py
 
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +14,11 @@ app = FastAPI()
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_BOT_TOKEN}"
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+def _chat_session_row(db,chat_id:str)->None:
+    existing = db.query(ChatSession).filter(ChatSession.chat_id == chat_id).first()
+    if not existing:
+        db.add(ChatSession(chat_id=chat_id, owner_id="default", current_draft_bill_id=None))
+        db.commit()
 
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(
@@ -25,6 +30,7 @@ async def telegram_webhook(
 
     update = await request.json()
     update_id = str(update.get("update_id"))
+    
 
    
     db = SessionLocal()
@@ -46,6 +52,12 @@ async def telegram_webhook(
         chat_id = str(message["chat"]["id"])
         text = message["text"]
         logger.info(f"Message from {chat_id}: {text}")
+
+        db = SessionLocal()
+        try:
+            _chat_session_row(db,chat_id)
+        finally:
+            db.close()
 
         # Run the agent and get its reply
         reply_text = await handle_telegram_message(chat_id, text)

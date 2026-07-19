@@ -18,7 +18,7 @@ def gen_id():
 class BillStatus(str, enum.Enum):
     draft = "draft"
     finalized = "finalized"
-    void = "void"
+    cancel = "cancel"
 
 
 class MovementReason(str, enum.Enum):

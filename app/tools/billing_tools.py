@@ -1,60 +1,43 @@
-import uuid
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime
 from langchain_core.tools import tool
 from app.db import SessionLocal
-from app.model import Bill, BillItem, Product, StockMovement, BillStatus, MovementReason,ChatSession, gen_id
+from app.model import Bill, BillItem, Product, StockMovement, BillStatus, MovementReason, gen_id
+from datetime import datetime
+from guardrails import check_not_below_cost
+from decimal import Decimal, ROUND_HALF_UP
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
-
-def _get_or_set_current_bill(db, chat_id: str, bill_id: str | None = None) -> str | None:
-    session = db.query(ChatSession).filter(ChatSession.chat_id == chat_id).first()
-    if not session:
-        session = ChatSession(chat_id=chat_id, owner_id="default", current_draft_bill_id=bill_id)
-        db.add(session)
-    elif bill_id is not None:
-        session.current_draft_bill_id = bill_id
-    db.commit()
-    return session.current_draft_bill_id
-
 
 def _round2(value) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def calculate_gst(line_subtotal: float, gst_slab: float, is_intra_state: bool = True) -> dict:
-    """Internal helper — NOT agent-facing. Splits GST into CGST/SGST (intra-state)
-    and returns rounded amounts. Call this from other tools, don't register it with the agent."""
     subtotal = Decimal(str(line_subtotal))
     slab = Decimal(str(gst_slab))
     total_tax = _round2(subtotal * slab / Decimal("100"))
-
     if is_intra_state:
         cgst = _round2(total_tax / 2)
-        sgst = total_tax - cgst  
+        sgst = total_tax - cgst
     else:
         cgst = Decimal("0.00")
-        sgst = Decimal("0.00")  
+        sgst = Decimal("0.00")
+    return {"cgst": cgst, "sgst": sgst, "line_total": _round2(subtotal + cgst + sgst)}
 
-    line_total = subtotal + cgst + sgst
-    return {
-        "cgst": cgst,
-        "sgst": sgst,
-        "line_total": _round2(line_total),
-    }
 
 
 @tool
-def start_bill(customer_id: str | None = None, payment_mode: str | None = None) -> str:
+def start_bill(customer_id: str | None = None, payment_mode: str | None = None,*, config: RunnableConfig) -> str:
     """Start a new draft bill. Call this when the owner begins cutting a bill
     (e.g. "make a bill: ..."). Returns the bill_id needed for all subsequent
     add_bill_item / finalize_bill calls in this transaction. customer_id is only
     needed if this sale goes on credit (khata) — otherwise leave it unset."""
+    chat_id = config["configurable"]["chat_id"]
     db = SessionLocal()
     try:
         bill = Bill(
             id=gen_id(),
-            chat_id="",  # set by caller/wrapper if you thread chat_id through; see note below
+            chat_id=chat_id,  
             status=BillStatus.draft,
             customer_id=customer_id,
             payment_mode=payment_mode,
@@ -65,16 +48,16 @@ def start_bill(customer_id: str | None = None, payment_mode: str | None = None) 
         )
         db.add(bill)
         db.commit()
-        return f"Started new bill (bill_id: {bill.id}). Add items with add_bill_item."
+        return f"Started new bill (bill_id: {bill.id}). Add items to the bill."
     finally:
         db.close()
 
 
 @tool
-def add_bill_item(bill_id: str, sku_or_name: str, qty: float) -> str:
-    """Add an item to a draft bill by quantity. Enforces stock availability — refuses
-    if there isn't enough stock (oversell guard). Call this once per item the owner
-    mentions. Does NOT decrement stock yet — stock is only decremented on finalize_bill."""
+def add_bill_item(bill_id: str, sku_or_name: str, qty: float, force: bool = False) -> str:
+    """Add an item to a draft bill by quantity. Enforces stock availability (oversell
+    guard) and refuses to sell below the product's recorded cost unless force=True
+    confirms it's intentional. Call this once per item the owner mentions."""
     db = SessionLocal()
     try:
         if qty <= 0:
@@ -88,14 +71,16 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float) -> str:
 
         product = db.query(Product).filter(
             (Product.sku == sku_or_name) | (Product.name.ilike(f"%{sku_or_name}%"))
-        ).first()
+        ).with_for_update().first()
         if not product:
             return f"No product found matching '{sku_or_name}'"
 
-        # Oversell guard: account for qty already reserved on THIS draft bill for the same product
-        already_on_bill = sum(
-            float(i.qty) for i in bill.items if i.product_id == product.id
-        )
+        # GUARDRAIL: don't sell below cost without explicit confirmation
+        cost_check = check_not_below_cost(product, float(product.sell_price), force=force)
+        if not cost_check.allowed:
+            return cost_check.message
+
+        already_on_bill = sum(float(i.qty) for i in bill.items if i.product_id == product.id)
         if float(product.qty_on_hand) < already_on_bill + qty:
             available = float(product.qty_on_hand) - already_on_bill
             return (
@@ -107,22 +92,12 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float) -> str:
         gst = calculate_gst(float(line_subtotal), float(product.gst_slab))
 
         item = BillItem(
-            id=gen_id(),
-            bill_id=bill.id,
-            product_id=product.id,
-            product_name=product.name,
-            qty=qty,
-            unit_price=product.sell_price,
-            gst_slab=product.gst_slab,
-            hsn_code=product.hsn_code,
-            line_subtotal=line_subtotal,
-            cgst_amt=gst["cgst"],
-            sgst_amt=gst["sgst"],
-            line_total=gst["line_total"],
+            id=gen_id(), bill_id=bill.id, product_id=product.id, product_name=product.name,
+            qty=qty, unit_price=product.sell_price, gst_slab=product.gst_slab,
+            hsn_code=product.hsn_code, line_subtotal=line_subtotal,
+            cgst_amt=gst["cgst"], sgst_amt=gst["sgst"], line_total=gst["line_total"],
         )
         db.add(item)
-
-        # keep bill's running totals in sync for get_bill_draft
         bill.subtotal = float(bill.subtotal) + float(line_subtotal)
         bill.cgst = float(bill.cgst) + float(gst["cgst"])
         bill.sgst = float(bill.sgst) + float(gst["sgst"])
@@ -132,6 +107,7 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float) -> str:
         return f"Added {qty} {product.unit} {product.name} @ ₹{product.sell_price} = ₹{gst['line_total']} (incl. GST) to bill {bill_id}"
     finally:
         db.close()
+
 
 
 @tool
@@ -160,8 +136,6 @@ def remove_bill_item(bill_id: str, item_id: str) -> str:
         return f"Removed {item.product_name} from bill {bill_id}"
     finally:
         db.close()
-
-
 @tool
 def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
     """Change the quantity of an existing item on a draft bill (e.g. "make it 6 Maggi").
@@ -181,7 +155,7 @@ def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
         if not item:
             return f"No item '{item_id}' found on bill {bill_id}"
 
-        product = db.query(Product).filter(Product.id == item.product_id).first()
+        product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
 
         # oversell guard for the new qty, excluding this item's own current reservation
         already_on_bill_other_items = sum(
@@ -217,7 +191,6 @@ def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
     finally:
         db.close()
 
-
 @tool
 def get_bill_draft(bill_id: str) -> str:
     """Show the current running total and line items for a draft bill —
@@ -242,8 +215,6 @@ def get_bill_draft(bill_id: str) -> str:
         )
     finally:
         db.close()
-
-
 @tool
 def finalize_bill(bill_id: str, idempotency_key: str) -> str:
     """Finalize a draft bill — decrements stock atomically and locks the bill.
@@ -253,12 +224,11 @@ def finalize_bill(bill_id: str, idempotency_key: str) -> str:
     when the owner confirms the bill is complete (e.g. says "done", "finalize", "that's it")."""
     db = SessionLocal()
     try:
-        # idempotency check FIRST, before touching anything else
-        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).first()
+        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).with_for_update().first()
         if existing_by_key:
             return f"Bill already finalized under this request (bill_id: {existing_by_key.id}, total ₹{existing_by_key.total}) — not double-charging."
 
-        bill = db.query(Bill).filter(Bill.id == bill_id).first()
+        bill = db.query(Bill).filter(Bill.id == bill_id).with_for_update().first()
         if not bill:
             return f"No bill found with id '{bill_id}'"
         if bill.status != BillStatus.draft:
@@ -266,16 +236,14 @@ def finalize_bill(bill_id: str, idempotency_key: str) -> str:
         if not bill.items:
             return f"Bill {bill_id} has no items — nothing to finalize"
 
-        # Re-verify stock for every line item before committing to the decrement
-        # (stock may have moved since add_bill_item due to another concurrent sale)
+     
         for item in bill.items:
             product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if float(product.qty_on_hand) < float(item.qty):
                 db.rollback()
                 return f"Cannot finalize: {product.name} now only has {product.qty_on_hand} {product.unit} in stock, but bill requires {item.qty}"
 
-        # Atomic decrement per item, using a locked row (with_for_update above) to
-        # prevent a concurrent sale from reading stale qty_on_hand
+      
         for item in bill.items:
             db.execute(
                 text("UPDATE products SET qty_on_hand = qty_on_hand - :qty WHERE id = :pid"),
@@ -309,7 +277,7 @@ def finalize_bill(bill_id: str, idempotency_key: str) -> str:
 
 
 @tool
-def void_bill(bill_id: str) -> str:
+def cancel_bill(bill_id: str) -> str:
     """Cancel a FINALIZED bill and reverse its stock decrement. Refuses to void a
     draft bill (nothing to reverse) or a bill that's already void. Use this only
     when the owner explicitly wants to cancel a completed sale, not to edit a draft
@@ -320,9 +288,9 @@ def void_bill(bill_id: str) -> str:
         if not bill:
             return f"No bill found with id '{bill_id}'"
         if bill.status == BillStatus.draft:
-            return f"Bill {bill_id} is still a draft — nothing to void. Use remove_bill_item to edit it."
-        if bill.status == BillStatus.void:
-            return f"Bill {bill_id} is already void."
+            return f"Bill {bill_id} is still a draft — nothing to cancel. Use remove_bill_item to edit it."
+        if bill.status == BillStatus.cancel:
+            return f"Bill {bill_id} is already cancel."
 
         for item in bill.items:
             db.execute(
@@ -338,8 +306,11 @@ def void_bill(bill_id: str) -> str:
                 created_at=datetime.utcnow(),
             ))
 
-        bill.status = BillStatus.void
+        bill.status = BillStatus.cancel
         db.commit()
-        return f"Bill {bill_id} voided. Stock for {len(bill.items)} item(s) reversed."
+        return f"Bill {bill_id} cancelled. Stock for {len(bill.items)} item(s) reversed."
     finally:
         db.close()
+
+
+
