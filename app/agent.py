@@ -11,9 +11,9 @@ from langgraph.checkpoint.postgres import PostgresSaver
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-_checkpointer_cm = PostgresSaver.from_conn_string(DATABASE_URL)
-checkpointer = _checkpointer_cm.__enter__()
-checkpointer.setup()
+def init_checkpointer():
+    """Returns a context manager yielding a ready-to-use PostgresSaver."""
+    return PostgresSaver.from_conn_string(DATABASE_URL)
 
 
 def build_agent():
