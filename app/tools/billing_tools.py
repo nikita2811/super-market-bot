@@ -33,6 +33,7 @@ def start_bill(customer_id: str | None = None, payment_mode: str | None = None,*
     add_bill_item / finalize_bill calls in this transaction. customer_id is only
     needed if this sale goes on credit (khata) — otherwise leave it unset."""
     chat_id = config["configurable"]["chat_id"]
+    print(f'{chat_id}')
     db = SessionLocal()
     try:
         bill = Bill(

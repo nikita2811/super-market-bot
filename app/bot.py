@@ -14,7 +14,7 @@ async def handle_telegram_message(chat_id: str, text: str) -> str:
         },
      )
      content = result["messages"][-1].content
- 
+     print(f"{content}")
      if isinstance(content, list):
          # content blocks — pull text parts and join
          return "".join(
