@@ -8,7 +8,7 @@ from app.tools.analytics_tools import (get_daily_summary,close_day,get_sales_ran
 from app.tools.invoice_tools import (generate_invoice_pdf,)
 def build_agent():
     return create_deep_agent(
-        model="google_genai:gemini-2.5-flash-lite",
+        model="google_genai:gemini-embedding-001",
         tools=[create_product, get_stock_level,update_product,get_product,search_products,receive_stock,list_low_stock,get_or_create_customer,add_credit,record_payment,get_balance
                ,get_preference,set_preference,start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill
                ,get_daily_summary,close_day,get_sales_range
