@@ -92,4 +92,16 @@ def check_khata_settlement_is_valid(db, customer_id: str, amount: float) -> Guar
         )
     return GuardrailResult(allowed=True, needs_confirmation=False)
 
-def check_oversell(product,qty_on_hand:float)->GuardrailResult:
+def check_oversell(product,qty_on_hand:float, already_reserved: float = 0)->GuardrailResult:
+    """Hard refuse if qty_requested (plus whatever's already reserved on this
+    draft bill for the same product) exceeds current stock. No force flag —
+    overselling has no legitimate override; if stock is genuinely wrong, fix it
+    via adjust_stock first, then retry the sale."""
+    available = float(product.qty_on_hand) - float(already_reserved)
+    if qty_on_hand > available:
+        return GuardrailResult.refuse(
+            f"Not enough stock: only {available} {product.unit} of {product.name} "
+            f"available (have {product.qty_on_hand}, {already_reserved} already reserved) — "
+            f"can't add {qty_on_hand}."
+        )
+    return GuardrailResult.ok()

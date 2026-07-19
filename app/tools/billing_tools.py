@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from app.db import SessionLocal
 from app.model import Bill, BillItem, Product, StockMovement, BillStatus, MovementReason, gen_id
 from datetime import datetime
-from app.tools.guardrails import check_not_below_cost
+from app.tools.guardrails import check_not_below_cost,check_oversell
 from decimal import Decimal, ROUND_HALF_UP
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
@@ -81,12 +81,9 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float, force: bool = Fals
             return cost_check.message
 
         already_on_bill = sum(float(i.qty) for i in bill.items if i.product_id == product.id)
-        if float(product.qty_on_hand) < already_on_bill + qty:
-            available = float(product.qty_on_hand) - already_on_bill
-            return (
-                f"Not enough stock: only {available} {product.unit} of {product.name} "
-                f"available (have {product.qty_on_hand}, {already_on_bill} already on this bill) — can't add {qty}"
-            )
+        oversell_check = check_oversell(product, qty, already_reserved=already_on_bill)
+        if not oversell_check.allowed:
+            return oversell_check.message
 
         line_subtotal = _round2(float(product.sell_price) * qty)
         gst = calculate_gst(float(line_subtotal), float(product.gst_slab))
