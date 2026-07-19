@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Numeric, DateTime, ForeignKey, Enum, UniqueConstraint, Text
+    Column, String, Integer, Numeric, DateTime, ForeignKey, Enum, UniqueConstraint, Text,Float,Date
 )
 from sqlalchemy.orm import relationship
 
@@ -131,3 +131,25 @@ class ProcessedUpdate(Base):
     __tablename__ = "processed_updates"
     update_id = Column(String, primary_key=True)
     processed_at = Column(DateTime, default=datetime.utcnow)
+
+
+
+
+
+class DailyClosure(Base):
+    __tablename__ = "daily_closures"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    closure_date = Column(Date, unique=True, nullable=False)
+    total_sales = Column(Float, nullable=False)
+    total_tax = Column(Float, nullable=False)
+    cash_total = Column(Float, default=0)
+    upi_total = Column(Float, default=0)
+    card_total = Column(Float, default=0)
+    other_total = Column(Float, default=0)
+    bill_count = Column(Integer, default=0)
+    top_items_json = Column(Text)
+    closed_at = Column(DateTime, nullable=False)
+
+
+

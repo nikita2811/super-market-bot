@@ -10,3 +10,4 @@ matplotlib>=3.9.2
 alembic
 deepagents
 langchain-google-genai
+reportlab

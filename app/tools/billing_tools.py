@@ -109,8 +109,20 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float, force: bool = Fals
 
 @tool
 def remove_bill_item(bill_id: str, item_id: str) -> str:
-    """Remove a specific item from a draft bill (e.g. "drop the butter").
-    Use get_bill_draft first if you need the item_id for a named item."""
+    """Remove an ENTIRE line item from a draft bill — not a partial quantity
+    reduction. Use this for phrases like "drop the butter", "remove the butter",
+    "remove butter from the bill", or "remove item: butter" — anything that
+    means take this product off the bill completely.
+
+    If the owner instead names a quantity smaller than what's currently on the
+    bill (e.g. "remove 2 packets of butter" when there are 5 on the bill), that
+    means reduce the quantity, not delete the line — call update_bill_item with
+    the new qty instead. Only call remove_bill_item if the requested quantity
+    matches (or exceeds) what's already on the bill, or if no quantity is
+    mentioned at all.
+
+    Call get_bill_draft first if you don't already have the item_id or need to
+    check the current quantity to decide between this and update_bill_item."""
     db = SessionLocal()
     try:
         bill = db.query(Bill).filter(Bill.id == bill_id).first()
