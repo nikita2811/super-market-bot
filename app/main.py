@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
         app.state.agent = build_agent(checkpointer)
         yield
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_BOT_TOKEN}"
