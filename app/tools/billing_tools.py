@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from app.db import SessionLocal
 from app.model import Bill, BillItem, Product, StockMovement, BillStatus, MovementReason, gen_id
 from datetime import datetime
-from guardrails import check_not_below_cost
+from app.tools.guardrails import check_not_below_cost
 from decimal import Decimal, ROUND_HALF_UP
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
