@@ -8,6 +8,19 @@ from datetime import datetime
 VALID_UNITS = {"kg", "g", "litre", "ml", "packet", "dozen", "piece"}
 VALID_GST_SLABS = {0, 5, 12, 18, 28}
 
+HSN_SUGGESTIONS = {
+    ("atta", 0): "1101",
+    ("atta", 5): "1101",
+    ("salt", 5): "2501",
+    ("butter", 12): "0405",
+    ("sunflower oil", 5): "1512",
+    ("maggi", 18): "1902",
+    ("parle-g", 18): "1905",
+    ("surf excel", 18): "3402",
+    ("rice", 0): "1006",
+    ("dal", 0): "0713",
+}
+
 def _sku_slug(name: str) -> str:
     """Generate a readable SKU from a product name, e.g. 'Amul Butter 100g' -> 'AMUL-BUTTER-100G'."""
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", name.strip()).strip("-").upper()
@@ -19,6 +32,20 @@ def _find_product(db, sku_or_name: str) -> Product | None:
         (Product.sku == sku_or_name) | (Product.name.ilike(f"%{sku_or_name}%"))
     ).first()
 
+
+@tool
+def suggest_hsn(product_name: str, gst_slab: float) -> str:
+    """Suggest a likely HSN code for a product based on its name and GST slab,
+    using common kirana product categories. This is a SUGGESTION ONLY — always
+    show it to the owner and get explicit confirmation before using it in
+    create_product. Never treat this as authoritative or pass it to create_product
+    without the owner confirming. If there's no match, say so and ask the owner
+    to check their supplier invoice for the correct HSN code."""
+    name_lower = product_name.lower()
+    for (keyword, slab), hsn in HSN_SUGGESTIONS.items():
+        if keyword in name_lower and slab == gst_slab:
+            return f"Likely HSN code for '{product_name}': {hsn} (based on GST {gst_slab}%) — please confirm this is correct before I add it."
+    return f"No HSN suggestion available for '{product_name}'. Please provide the HSN code from your supplier invoice, or I can proceed without full compliance detail if you're not sure."
 
 @tool
 def create_product(
@@ -36,8 +63,10 @@ def create_product(
     """Add a BRAND NEW product to the catalog that has never existed before.
     Do NOT use this to add stock of an existing product — use receive_stock for that.
     If you're unsure whether the product already exists, call search_products first.
-    Do NOT call this tool if GST slab, unit, or HSN code is missing from the owner's
+    Do NOT call this tool if GST slab or unit is missing from the owner's
     message — ask the owner for the missing detail instead of guessing a default.
+    If the owner gives a GST rate but no HSN code, call suggest_hsn first and get
+    their confirmation before calling this tool — do not guess an HSN code yourself.
     The SKU is generated automatically from the product name."""
     db = SessionLocal()
     try:
