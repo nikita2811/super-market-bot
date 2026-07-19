@@ -28,7 +28,16 @@ def calculate_gst(line_subtotal: float, gst_slab: float, is_intra_state: bool = 
         sgst = Decimal("0.00")
     return {"cgst": cgst, "sgst": sgst, "line_total": _round2(subtotal + cgst + sgst)}
 
-
+def _resolve_bill_item(bill, item_id_or_name: str):
+    """Find a bill item by exact item_id first; fall back to matching product_name
+    (case-insensitive substring) if the model passed a name instead of a real ID."""
+    item = next((i for i in bill.items if i.id == item_id_or_name), None)
+    if item:
+        return item
+    matches = [i for i in bill.items if item_id_or_name.lower() in i.product_name.lower()]
+    if len(matches) == 1:
+        return matches[0]
+    return None  
 
 @tool
 def start_bill(customer_id: str | None = None, payment_mode: str | None = None,*, config: RunnableConfig) -> str:
@@ -109,8 +118,6 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float, force: bool = Fals
     finally:
         db.close()
 
-
-
 @tool
 def remove_bill_item(bill_id: str, item_id: str) -> str:
     """Remove an ENTIRE line item from a draft bill — not a partial quantity
@@ -125,8 +132,9 @@ def remove_bill_item(bill_id: str, item_id: str) -> str:
     matches (or exceeds) what's already on the bill, or if no quantity is
     mentioned at all.
 
-    Call get_bill_draft first if you don't already have the item_id or need to
-    check the current quantity to decide between this and update_bill_item."""
+    item_id should be the exact item_id shown by get_bill_draft. Call
+    get_bill_draft first if you don't already have it, or need to check the
+    current quantity to decide between this and update_bill_item."""
     db = SessionLocal()
     try:
         bill = db.query(Bill).filter(Bill.id == bill_id).first()
@@ -135,9 +143,9 @@ def remove_bill_item(bill_id: str, item_id: str) -> str:
         if bill.status != BillStatus.draft:
             return f"Bill {bill_id} is already {bill.status.value} — can't edit it"
 
-        item = next((i for i in bill.items if i.id == item_id), None)
+        item = _resolve_bill_item(bill, item_id)
         if not item:
-            return f"No item '{item_id}' found on bill {bill_id}"
+            return f"No item matching '{item_id}' found on bill {bill_id} — call get_bill_draft to see current item_ids"
 
         bill.subtotal = float(bill.subtotal) - float(item.line_subtotal)
         bill.cgst = float(bill.cgst) - float(item.cgst_amt)
@@ -149,10 +157,15 @@ def remove_bill_item(bill_id: str, item_id: str) -> str:
         return f"Removed {item.product_name} from bill {bill_id}"
     finally:
         db.close()
+
+
 @tool
 def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
     """Change the quantity of an existing item on a draft bill (e.g. "make it 6 Maggi").
-    Re-checks stock availability and recalculates GST for the new quantity."""
+    Re-checks stock availability and recalculates GST for the new quantity.
+
+    item_id should be the exact item_id shown by get_bill_draft. Call
+    get_bill_draft first if you don't already have it."""
     db = SessionLocal()
     try:
         if qty <= 0:
@@ -164,13 +177,12 @@ def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
         if bill.status != BillStatus.draft:
             return f"Bill {bill_id} is already {bill.status.value} — can't edit it"
 
-        item = next((i for i in bill.items if i.id == item_id), None)
+        item = _resolve_bill_item(bill, item_id)
         if not item:
-            return f"No item '{item_id}' found on bill {bill_id}"
+            return f"No item matching '{item_id}' found on bill {bill_id} — call get_bill_draft to see current item_ids"
 
         product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
 
-        # oversell guard for the new qty, excluding this item's own current reservation
         already_on_bill_other_items = sum(
             float(i.qty) for i in bill.items if i.product_id == product.id and i.id != item.id
         )
@@ -178,13 +190,11 @@ def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
             available = float(product.qty_on_hand) - already_on_bill_other_items
             return f"Not enough stock: only {available} {product.unit} of {product.name} available — can't set qty to {qty}"
 
-        # back out old totals
         bill.subtotal = float(bill.subtotal) - float(item.line_subtotal)
         bill.cgst = float(bill.cgst) - float(item.cgst_amt)
         bill.sgst = float(bill.sgst) - float(item.sgst_amt)
         bill.total = float(bill.total) - float(item.line_total)
 
-        # recompute for new qty
         line_subtotal = _round2(float(item.unit_price) * qty)
         gst = calculate_gst(float(line_subtotal), float(item.gst_slab))
 
@@ -204,11 +214,13 @@ def update_bill_item(bill_id: str, item_id: str, qty: float) -> str:
     finally:
         db.close()
 
+
 @tool
 def get_bill_draft(bill_id: str) -> str:
     """Show the current running total and line items for a draft bill —
     use this to preview a bill before finalizing, or when the owner asks
-    what's on the bill so far."""
+    what's on the bill so far. Also use this to look up an item's item_id
+    before calling remove_bill_item or update_bill_item."""
     db = SessionLocal()
     try:
         bill = db.query(Bill).filter(Bill.id == bill_id).first()
@@ -219,7 +231,8 @@ def get_bill_draft(bill_id: str) -> str:
             return f"Bill {bill_id} is empty so far."
 
         lines = [
-            f"- {i.product_name} x{i.qty} @ ₹{i.unit_price} = ₹{i.line_total} (GST {i.gst_slab}%: CGST ₹{i.cgst_amt} + SGST ₹{i.sgst_amt})"
+            f"- [item_id: {i.id}] {i.product_name} x{i.qty} @ ₹{i.unit_price} = ₹{i.line_total} "
+            f"(GST {i.gst_slab}%: CGST ₹{i.cgst_amt} + SGST ₹{i.sgst_amt})"
             for i in bill.items
         ]
         return (
@@ -228,66 +241,6 @@ def get_bill_draft(bill_id: str) -> str:
         )
     finally:
         db.close()
-@tool
-def finalize_bill(bill_id: str, idempotency_key: str) -> str:
-    """Finalize a draft bill — decrements stock atomically and locks the bill.
-    idempotency_key must be a stable value for this specific finalize request
-    (e.g. derived from the Telegram update_id) so that a retried request does NOT
-    double-decrement stock or create a duplicate finalized bill. Call this only
-    when the owner confirms the bill is complete (e.g. says "done", "finalize", "that's it")."""
-    db = SessionLocal()
-    try:
-        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).with_for_update().first()
-        if existing_by_key:
-            return f"Bill already finalized under this request (bill_id: {existing_by_key.id}, total ₹{existing_by_key.total}) — not double-charging."
-
-        bill = db.query(Bill).filter(Bill.id == bill_id).with_for_update().first()
-        if not bill:
-            return f"No bill found with id '{bill_id}'"
-        if bill.status != BillStatus.draft:
-            return f"Bill {bill_id} is already {bill.status.value} — can't finalize again"
-        if not bill.items:
-            return f"Bill {bill_id} has no items — nothing to finalize"
-
-     
-        for item in bill.items:
-            product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
-            if float(product.qty_on_hand) < float(item.qty):
-                db.rollback()
-                return f"Cannot finalize: {product.name} now only has {product.qty_on_hand} {product.unit} in stock, but bill requires {item.qty}"
-
-      
-        for item in bill.items:
-            db.execute(
-                text("UPDATE products SET qty_on_hand = qty_on_hand - :qty WHERE id = :pid"),
-                {"qty": float(item.qty), "pid": item.product_id},
-            )
-            db.add(StockMovement(
-                id=gen_id(),
-                product_id=item.product_id,
-                delta=-float(item.qty),
-                reason=MovementReason.sale,
-                ref_id=bill.id,
-                created_at=datetime.utcnow(),
-            ))
-
-        bill.status = BillStatus.finalized
-        bill.idempotency_key = idempotency_key
-        bill.finalized_at = datetime.utcnow()
-        db.commit()
-
-        return f"Bill {bill_id} finalized. Total: ₹{bill.total} ({bill.payment_mode or 'payment mode not set'})"
-
-    except IntegrityError:
-        db.rollback()
-        # unique constraint on idempotency_key caught a race between two concurrent retries
-        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).first()
-        if existing_by_key:
-            return f"Bill already finalized under this request (bill_id: {existing_by_key.id}) — not double-charging."
-        return "Finalize failed due to a conflicting request — please retry."
-    finally:
-        db.close()
-
 
 @tool
 def cancel_bill(bill_id: str) -> str:
