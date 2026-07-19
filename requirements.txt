@@ -11,3 +11,4 @@ alembic
 deepagents
 langchain-google-genai
 reportlab
+langgraph

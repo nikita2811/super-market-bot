@@ -7,6 +7,15 @@ from app.tools.billing_tools import (start_bill,add_bill_item,remove_bill_item,g
 from app.tools.analytics_tools import (get_daily_summary,close_day,get_sales_range)
 from app.tools.invoice_tools import (generate_invoice_pdf,)
 import os
+from langgraph.checkpoint.postgres import PostgresSaver
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+_checkpointer_cm = PostgresSaver.from_conn_string(DATABASE_URL)
+checkpointer = _checkpointer_cm.__enter__()
+checkpointer.setup()
+
+
 def build_agent():
     return create_deep_agent(
         model=os.getenv("AGENT_MODEL"),
@@ -21,4 +30,5 @@ def build_agent():
     "Always use tools for prices, stock, and GST — never invent numbers. "
     "Ask a clarifying question when a product name is ambiguous or a required detail is missing."
         ),
+    checkpointer=checkpointer,
     )

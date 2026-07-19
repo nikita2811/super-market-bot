@@ -7,6 +7,10 @@ from decimal import Decimal, ROUND_HALF_UP
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("super-market-bot")
 
 def _round2(value) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -32,8 +36,7 @@ def start_bill(customer_id: str | None = None, payment_mode: str | None = None,*
     (e.g. "make a bill: ..."). Returns the bill_id needed for all subsequent
     add_bill_item / finalize_bill calls in this transaction. customer_id is only
     needed if this sale goes on credit (khata) — otherwise leave it unset."""
-    chat_id = config["configurable"]["chat_id"]
-    print(f'chat id being passed : {chat_id}')
+    
     db = SessionLocal()
     try:
         bill = Bill(
