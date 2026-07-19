@@ -5,11 +5,20 @@ from app.config import TELEGRAM_WEBHOOK_SECRET, TELEGRAM_BOT_TOKEN
 from app.db import SessionLocal
 from app.model import ProcessedUpdate,ChatSession
 from app.bot import handle_telegram_message  # the function from agent.py/bot.py
+from contextlib import asynccontextmanager
+from app.agent import init_checkpointer,build_agent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("super-market-bot")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with init_checkpointer() as checkpointer:
+        app.state.agent = build_agent(checkpointer)
+        yield
+
 app = FastAPI()
+
 
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_BOT_TOKEN}"
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
