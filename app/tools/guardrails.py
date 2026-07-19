@@ -99,9 +99,9 @@ def check_oversell(product,qty_on_hand:float, already_reserved: float = 0)->Guar
     via adjust_stock first, then retry the sale."""
     available = float(product.qty_on_hand) - float(already_reserved)
     if qty_on_hand > available:
-        return GuardrailResult.refuse(
+        return GuardrailResult(allowed=False, needs_confirmation=False, message=
             f"Not enough stock: only {available} {product.unit} of {product.name} "
             f"available (have {product.qty_on_hand}, {already_reserved} already reserved) — "
             f"can't add {qty_on_hand}."
         )
-    return GuardrailResult.ok()
+    return GuardrailResult(allowed=True, needs_confirmation=False)
