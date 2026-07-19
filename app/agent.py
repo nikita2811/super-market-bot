@@ -16,7 +16,7 @@ def init_checkpointer():
     return PostgresSaver.from_conn_string(DATABASE_URL)
 
 
-def build_agent():
+def build_agent(checkpointer):
     return create_deep_agent(
         model=os.getenv("AGENT_MODEL"),
         tools=[create_product, get_stock_level,update_product,get_product,search_products,receive_stock,list_low_stock,get_or_create_customer,add_credit,record_payment,get_balance
