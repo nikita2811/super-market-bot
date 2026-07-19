@@ -69,7 +69,7 @@ async def telegram_webhook(
             db.close()
 
         # Run the agent and get its reply
-        reply_text = await handle_telegram_message(chat_id, text)
+        reply_text = await handle_telegram_message(request,chat_id, text)
 
         # Send the reply back to Telegram
         async with httpx.AsyncClient() as http_client:

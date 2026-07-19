@@ -1,9 +1,10 @@
 from app.agent import build_agent
 
-agent = build_agent() 
 
 
-async def handle_telegram_message(chat_id: str, text: str) -> str:
+
+async def handle_telegram_message(request,chat_id: str, text: str) -> str:
+     agent = request.app.state.agent
      result = agent.invoke(
         {"messages": [{"role": "user", "content": text}]},
         config={
