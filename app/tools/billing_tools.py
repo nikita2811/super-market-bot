@@ -37,7 +37,7 @@ def _resolve_bill_item(bill, item_id_or_name: str):
     matches = [i for i in bill.items if item_id_or_name.lower() in i.product_name.lower()]
     if len(matches) == 1:
         return matches[0]
-    return None  
+    return None 
 
 @tool
 def start_bill(customer_id: str | None = None, payment_mode: str | None = None,*, config: RunnableConfig) -> str:
@@ -117,6 +117,10 @@ def add_bill_item(bill_id: str, sku_or_name: str, qty: float, force: bool = Fals
         return f"Added {qty} {product.unit} {product.name} @ ₹{product.sell_price} = ₹{gst['line_total']} (incl. GST) to bill {bill_id}"
     finally:
         db.close()
+
+
+ 
+
 
 @tool
 def remove_bill_item(bill_id: str, item_id: str) -> str:
@@ -241,6 +245,71 @@ def get_bill_draft(bill_id: str) -> str:
         )
     finally:
         db.close()
+
+  
+
+      
+      
+@tool
+def finalize_bill(bill_id: str, idempotency_key: str) -> str:
+    """Finalize a draft bill — decrements stock atomically and locks the bill.
+    idempotency_key must be a stable value for this specific finalize request
+    (e.g. derived from the Telegram update_id) so that a retried request does NOT
+    double-decrement stock or create a duplicate finalized bill. Call this only
+    when the owner confirms the bill is complete (e.g. says "done", "finalize", "that's it")."""
+    db = SessionLocal()
+    try:
+        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).with_for_update().first()
+        if existing_by_key:
+            return f"Bill already finalized under this request (bill_id: {existing_by_key.id}, total ₹{existing_by_key.total}) — not double-charging."
+
+        bill = db.query(Bill).filter(Bill.id == bill_id).with_for_update().first()
+        if not bill:
+            return f"No bill found with id '{bill_id}'"
+        if bill.status != BillStatus.draft:
+            return f"Bill {bill_id} is already {bill.status.value} — can't finalize again"
+        if not bill.items:
+            return f"Bill {bill_id} has no items — nothing to finalize"
+
+     
+        for item in bill.items:
+            product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+            if float(product.qty_on_hand) < float(item.qty):
+                db.rollback()
+                return f"Cannot finalize: {product.name} now only has {product.qty_on_hand} {product.unit} in stock, but bill requires {item.qty}"
+
+      
+        for item in bill.items:
+            db.execute(
+                text("UPDATE products SET qty_on_hand = qty_on_hand - :qty WHERE id = :pid"),
+                {"qty": float(item.qty), "pid": item.product_id},
+            )
+            db.add(StockMovement(
+                id=gen_id(),
+                product_id=item.product_id,
+                delta=-float(item.qty),
+                reason=MovementReason.sale,
+                ref_id=bill.id,
+                created_at=datetime.utcnow(),
+            ))
+
+        bill.status = BillStatus.finalized
+        bill.idempotency_key = idempotency_key
+        bill.finalized_at = datetime.utcnow()
+        db.commit()
+
+        return f"Bill {bill_id} finalized. Total: ₹{bill.total} ({bill.payment_mode or 'payment mode not set'})"
+
+    except IntegrityError:
+        db.rollback()
+        # unique constraint on idempotency_key caught a race between two concurrent retries
+        existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).first()
+        if existing_by_key:
+            return f"Bill already finalized under this request (bill_id: {existing_by_key.id}) — not double-charging."
+        return "Finalize failed due to a conflicting request — please retry."
+    finally:
+        db.close()
+
 
 @tool
 def cancel_bill(bill_id: str) -> str:
