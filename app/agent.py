@@ -19,7 +19,7 @@ def init_checkpointer():
     pool = ConnectionPool(
         conninfo=DATABASE_URL,
         max_size=20,
-        kwargs={"autocommit": True, "prepare_threshold": 0},
+        kwargs={"autocommit": True, "prepare_threshold": None},
     )
     return pool
 
