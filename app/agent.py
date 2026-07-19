@@ -8,15 +8,24 @@ from app.tools.analytics_tools import (get_daily_summary,close_day,get_sales_ran
 from app.tools.invoice_tools import (generate_invoice_pdf,)
 import os
 from langgraph.checkpoint.postgres import PostgresSaver
+from psycopg_pool import ConnectionPool
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
+
 def init_checkpointer():
-    """Returns a context manager yielding a ready-to-use PostgresSaver."""
-    return PostgresSaver.from_conn_string(DATABASE_URL)
+    """Returns a connection pool wrapped as a context manager, safe for concurrent requests."""
+    pool = ConnectionPool(
+        conninfo=DATABASE_URL,
+        max_size=20,
+        kwargs={"autocommit": True, "prepare_threshold": 0},
+    )
+    return pool
 
 
-def build_agent(checkpointer):
+def build_agent(pool):
+    checkpointer = PostgresSaver(pool)
     return create_deep_agent(
         model=os.getenv("AGENT_MODEL"),
         tools=[create_product, get_stock_level,update_product,get_product,search_products,receive_stock,list_low_stock,get_or_create_customer,add_credit,record_payment,get_balance
