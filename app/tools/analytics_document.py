@@ -1,4 +1,3 @@
-
 import os
 import tempfile
 from datetime import date, datetime, timedelta
@@ -11,8 +10,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 from app.db import SessionLocal
-from app.model import Product, Bill, BillItem, BillStatus
-from app.config import SHOP_NAME
+from app.model import Product, Bill, BillItem, BillStatus, Preference
 from app.chart_utils import (
     sales_trend_chart,
     top_skus_chart,
@@ -30,6 +28,13 @@ GREY = RGBColor(0x7F, 0x8C, 0x8D)
 SLIDE_W = Inches(13.33)
 SLIDE_H = Inches(7.5)
 
+
+def _get_shop_name(db) -> str:
+    prefs = db.query(Preference).filter(
+        Preference.owner_id == "default",
+        Preference.key == "shop_details",
+    ).first()
+    return (prefs.shop_name if prefs else None) or "Your Shop"
 
 
 def _gather_range_data(db, start_date: date, end_date: date) -> dict:
@@ -127,8 +132,7 @@ def _gather_stock_health(db, limit: int = 10) -> dict:
     }
 
 
-
-def _add_title_slide(prs: Presentation, start_date: date, end_date: date) -> None:
+def _add_title_slide(prs: Presentation, start_date: date, end_date: date, shop_name: str) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank layout
 
     title_box = slide.shapes.add_textbox(Inches(0.8), Inches(2.6), Inches(11.7), Inches(1.2))
@@ -140,7 +144,7 @@ def _add_title_slide(prs: Presentation, start_date: date, end_date: date) -> Non
 
     subtitle_box = slide.shapes.add_textbox(Inches(0.8), Inches(3.7), Inches(11.7), Inches(0.7))
     tf2 = subtitle_box.text_frame
-    tf2.text = f"{SHOP_NAME} — {start_date.strftime('%d %b %Y')} to {end_date.strftime('%d %b %Y')}"
+    tf2.text = f"{shop_name} — {start_date.strftime('%d %b %Y')} to {end_date.strftime('%d %b %Y')}"
     tf2.paragraphs[0].font.size = Pt(20)
     tf2.paragraphs[0].font.color.rgb = TEAL
 
@@ -203,8 +207,6 @@ def _add_insights_slide(prs: Presentation, data: dict, gst_data: dict, stock_dat
         p.space_after = Pt(14)
 
 
-
-
 @tool
 def generate_report_pptx(start: str, end: str) -> str:
     """Generate a business-analysis PowerPoint deck for a date range: a title
@@ -236,11 +238,13 @@ def generate_report_pptx(start: str, end: str) -> str:
         if range_data["range_bill_count"] == 0:
             return f"No finalized sales between {start} and {end} — nothing to build a deck from yet."
 
+        shop_name = _get_shop_name(db)
+
         prs = Presentation()
         prs.slide_width = SLIDE_W
         prs.slide_height = SLIDE_H
 
-        _add_title_slide(prs, start_date, end_date)
+        _add_title_slide(prs, start_date, end_date, shop_name)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             # Sales trend

@@ -5,7 +5,8 @@ from app.tools.credit_leadger_tools import (get_or_create_customer,add_credit,re
 from app.tools.preferences_tools import (get_preference,set_preference)
 from app.tools.billing_tools import (start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill,update_bill_item)
 from app.tools.analytics_tools import (get_daily_summary,close_day,get_sales_range)
-from app.tools.invoice_tools import (generate_invoice_pdf,)
+from app.tools.invoice_tools import (generate_invoice_pdf)
+from app.tools.analytics_document import (generate_report_pptx)
 import os
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg_pool import ConnectionPool
@@ -31,7 +32,8 @@ def build_agent(pool):
         tools=[create_product, get_stock_level,update_product,get_product,search_products,receive_stock,list_low_stock,get_or_create_customer,add_credit,record_payment,get_balance
                ,get_preference,set_preference,start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill,update_bill_item
                ,get_daily_summary,close_day,get_sales_range
-               ,generate_invoice_pdf],
+               ,generate_invoice_pdf
+               ,generate_report_pptx],
         system_prompt=(
             "You run a super market store's operations via chat. The owner writes in "
     "short, terse, real-shopkeeper English or Hinglish or Hindi — messages may be fragments, "
