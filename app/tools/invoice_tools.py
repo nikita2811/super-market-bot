@@ -51,6 +51,7 @@ def generate_invoice_pdf(bill_id: str) -> str:
             except ImportError:
                 customer = {"name": bill.customer_id, "gstin": None}
 
+        
         prefs = db.query(Preference).first()
         if not prefs:
             return "Shop preferences are not set up yet — add your shop details before generating invoices."
@@ -82,6 +83,6 @@ def generate_invoice_pdf(bill_id: str) -> str:
         output_path = os.path.join(INVOICE_OUTPUT_DIR, f"invoice_{bill.id}.pdf")
         render_gst_invoice(output_path, invoice_data)
 
-        return f"Invoice generated: {output_path}"
+        return f"Invoice generated. FILE_PATH: {output_path}"
     finally:
         db.close()
