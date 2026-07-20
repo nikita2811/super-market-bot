@@ -305,7 +305,7 @@ def finalize_bill(bill_id: str, idempotency_key: str) -> str:
         # unique constraint on idempotency_key caught a race between two concurrent retries
         existing_by_key = db.query(Bill).filter(Bill.idempotency_key == idempotency_key).first()
         if existing_by_key:
-            return f"Bill already finalized under this request (bill_id: {existing_by_key.id}) — not double-charging."
+            return f"Bill already finalized under this request (not double-charging."
         return "Finalize failed due to a conflicting request — please retry."
     finally:
         db.close()
@@ -343,7 +343,7 @@ def cancel_bill(bill_id: str) -> str:
 
         bill.status = BillStatus.cancel
         db.commit()
-        return f"Bill {bill_id} cancelled. Stock for {len(bill.items)} item(s) reversed."
+        return f"Bill {bill_id} cancelled.Stock for {len(bill.items)} item(s) reversed."
     finally:
         db.close()
 

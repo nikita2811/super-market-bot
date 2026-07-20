@@ -1,9 +1,8 @@
 import os
 from langchain_core.tools import tool
 from app.db import SessionLocal
-from app.model import Bill, BillStatus, Product
+from app.model import Bill, BillStatus, Product, Preferences
 from app.invoice_template import render_gst_invoice
-from app.config import SHOP_NAME
 
 INVOICE_OUTPUT_DIR = os.environ.get("INVOICE_OUTPUT_DIR", "/tmp/invoices")
 
@@ -45,12 +44,26 @@ def generate_invoice_pdf(bill_id: str) -> str:
                 from app.model import Customer
                 cust = db.query(Customer).filter(Customer.id == bill.customer_id).first()
                 if cust:
-                    customer = {"name": getattr(cust, "name", bill.customer_id), "gstin": getattr(cust, "gstin", None)}
+                    customer = {
+                        "name": getattr(cust, "name", bill.customer_id),
+                        "gstin": getattr(cust, "gstin", None),
+                    }
             except ImportError:
                 customer = {"name": bill.customer_id, "gstin": None}
 
+        prefs = db.query(Preferences).first()
+        if not prefs:
+            return "Shop preferences are not set up yet — add your shop details before generating invoices."
+
+        seller = {
+            "name": getattr(prefs, "shop_name", "") or "",
+            "address": getattr(prefs, "address", "") or "",
+            "gstin": getattr(prefs, "gstin", "") or "",
+            "phone": getattr(prefs, "phone", "") or "",
+        }
+
         invoice_data = {
-            "seller": {"name": SHOP_NAME},
+            "seller": seller,
             "invoice_no": bill.id,
             "invoice_date": (bill.finalized_at or bill.created_at).strftime("%d %b %Y"),
             "status_note": "CANCELLED" if bill.status == BillStatus.cancel else None,
@@ -58,7 +71,10 @@ def generate_invoice_pdf(bill_id: str) -> str:
             "payment_mode": bill.payment_mode,
             "items": items_data,
             "totals": {
-                "subtotal": bill.subtotal, "cgst": bill.cgst, "sgst": bill.sgst, "total": bill.total,
+                "subtotal": bill.subtotal,
+                "cgst": bill.cgst,
+                "sgst": bill.sgst,
+                "total": bill.total,
             },
         }
 

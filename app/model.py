@@ -117,6 +117,10 @@ class Preference(Base):
     owner_id = Column(String, nullable=False, default="default")
     key = Column(String, nullable=False)
     value = Column(Text, nullable=False)
+    shop_name= Column(String,nullable=True)
+    address=Column(String,nullable=True)
+    gstin=Column(String,nullable=True)
+    phone=Column(Integer,nullable=True)
     __table_args__ = (UniqueConstraint("owner_id", "key", name="uq_owner_key"),)
 
 
