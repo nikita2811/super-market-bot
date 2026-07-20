@@ -2,7 +2,7 @@ from deepagents import create_deep_agent
 from app.tools.product_tools import (create_product, get_stock_level,update_product,
                                      get_product,search_products,receive_stock,list_low_stock)
 from app.tools.credit_leadger_tools import (get_or_create_customer,add_credit,record_payment,get_balance)
-from app.tools.preferences_tools import (get_preference,set_preference)
+from app.tools.preferences_tools import (get_preference,set_preference,get_shop_details,set_shop_details)
 from app.tools.billing_tools import (start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill,update_bill_item)
 from app.tools.analytics_tools import (get_daily_summary,close_day,get_sales_range)
 from app.tools.invoice_tools import (generate_invoice_pdf)
@@ -30,7 +30,7 @@ def build_agent(pool):
     return create_deep_agent(
         model=os.getenv("AGENT_MODEL"),
         tools=[create_product, get_stock_level,update_product,get_product,search_products,receive_stock,list_low_stock,get_or_create_customer,add_credit,record_payment,get_balance
-               ,get_preference,set_preference,start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill,update_bill_item
+               ,get_preference,set_preference,set_shop_details,get_shop_details,start_bill,add_bill_item,remove_bill_item,get_bill_draft,finalize_bill,cancel_bill,update_bill_item
                ,get_daily_summary,close_day,get_sales_range
                ,generate_invoice_pdf
                ,generate_report_pptx],
