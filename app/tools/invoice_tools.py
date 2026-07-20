@@ -59,7 +59,7 @@ def generate_invoice_pdf(bill_id: str) -> str:
             "name": getattr(prefs, "shop_name", "") or "",
             "address": getattr(prefs, "address", "") or "",
             "gstin": getattr(prefs, "gstin", "") or "",
-            "phone": getattr(prefs, "Phone", "") or "",
+            "phone": getattr(prefs, "phone", "") or "",
         }
 
         invoice_data = {
