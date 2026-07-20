@@ -1,7 +1,7 @@
 import os
 from langchain_core.tools import tool
 from app.db import SessionLocal
-from app.model import Bill, BillStatus, Product, Preferences
+from app.model import Bill, BillStatus, Product, Preference
 from app.invoice_template import render_gst_invoice
 
 INVOICE_OUTPUT_DIR = os.environ.get("INVOICE_OUTPUT_DIR", "/tmp/invoices")
@@ -51,7 +51,7 @@ def generate_invoice_pdf(bill_id: str) -> str:
             except ImportError:
                 customer = {"name": bill.customer_id, "gstin": None}
 
-        prefs = db.query(Preferences).first()
+        prefs = db.query(Preference).first()
         if not prefs:
             return "Shop preferences are not set up yet — add your shop details before generating invoices."
 
