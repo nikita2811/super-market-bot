@@ -14,3 +14,4 @@ reportlab
 langgraph-checkpoint-postgres
 psycopg[binary]
 psycopg-pool
+apscheduler
