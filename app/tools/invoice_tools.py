@@ -52,7 +52,9 @@ def generate_invoice_pdf(bill_id: str) -> str:
                 customer = {"name": bill.customer_id, "gstin": None}
 
         
-        prefs = db.query(Preference).first()
+        prefs = db.query(Preference).filter(
+            Preference.key == "shop_details",
+        ).first()
         if not prefs:
             return "Shop preferences are not set up yet — add your shop details before generating invoices."
 
