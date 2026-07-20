@@ -53,7 +53,7 @@ def generate_invoice_pdf(bill_id: str) -> str:
             "seller": {"name": SHOP_NAME},
             "invoice_no": bill.id,
             "invoice_date": (bill.finalized_at or bill.created_at).strftime("%d %b %Y"),
-            "status_note": "CANCELLED" if bill.status == BillStatus.void else None,
+            "status_note": "CANCELLED" if bill.status == BillStatus.cancel else None,
             "customer": customer,
             "payment_mode": bill.payment_mode,
             "items": items_data,
