@@ -72,7 +72,7 @@ def render_gst_invoice(output_path: str, invoice_data: dict) -> None:
     story = []
 
     seller = invoice_data["seller"]
-    story.append(Paragraph(seller["shop_name"], styles["SellerName"]))
+    story.append(Paragraph(seller["name"], styles["SellerName"]))
     story.append(Paragraph(seller["address"], styles["Normal"]))
     story.append(Paragraph(f"GSTIN: {seller['gstin']} | Phone: {seller['phone']}", styles["Normal"]))
     story.append(Spacer(1, 8))
