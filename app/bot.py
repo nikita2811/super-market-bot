@@ -10,12 +10,6 @@ logger = logging.getLogger("super-market-bot")
 
 FILE_PRODUCING_TOOLS = {"generate_invoice_pdf", "generate_report_pptx"}
 FILE_PATH_PATTERN = re.compile(r"FILE_PATH:\s*(\S+)")
-PATH_LEAK_PATTERN = re.compile(r"\s*[:\-]?\s*\S*/[\w./-]+\.(?:pdf|pptx)")
-
- 
-def _strip_leaked_paths(text: str) -> str:
-    cleaned = PATH_LEAK_PATTERN.sub("", text)
-    return re.sub(r"\s{2,}", " ", cleaned).strip()
 
 
 async def handle_telegram_message(request, chat_id: str, text: str, update_id: str) -> dict:
@@ -47,23 +41,25 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
         ) or "Sorry, I couldn't process that."
     else:
         reply_text = content or "Sorry, I couldn't process that."
-
-    file_paths = []  
-    for msg in new_messages:  
+    
+    if isinstance(content, list):
+        
+        reply_text = "".join(
+            block["text"] for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ) or "Sorry, I couldn't process that."
+    else:
+        reply_text = content or "Sorry, I couldn't process that."
+    
+    file_path = None
+    for msg in new_messages:
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
             tool_content = msg.content if isinstance(msg.content, str) else str(msg.content)
             match = FILE_PATH_PATTERN.search(tool_content)
-            if not match:
-                continue
-            path = match.group(1)
-            if os.path.exists(path):
-                file_paths.append(path)
-            else:
-                logger.error(f"Tool {tool_name} reported a path that doesn't exist: {path}")
-            reply_text = _strip_leaked_paths(reply_text)
-            if not reply_text and file_paths:
-               reply_text = "Here's your file."
+            if match:
+                file_path = match.group(1)
 
-    return {"text": reply_text, "file_paths": file_paths}
+
+    return {"text": reply_text, "file_paths": file_path}
     
