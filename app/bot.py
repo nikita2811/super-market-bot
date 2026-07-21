@@ -27,7 +27,7 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
     prior_state = agent.get_state(config)
     prior_count = len(prior_state.values.get("messages", [])) if prior_state.values else 0
 
-    result = await asyncio.to_thread( agent.invoke({"messages": [{"role": "user", "content": text}]},config=config), config=config)
+    result = await asyncio.to_thread(agent.invoke,{"messages": [{"role": "user", "content": text}]},config=config,)
     t1 = time.monotonic()
     logger.info(f"agent turn took {t1 - t0:.2f}s for chat {chat_id}")
     all_messages = result["messages"]
