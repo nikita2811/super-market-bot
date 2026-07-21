@@ -39,6 +39,7 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
     for msg in messages:
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
+            logger.info(f"tool_name:{tool_name}")
             tool_content = msg.content if isinstance(msg.content, str) else str(msg.content)
             match = FILE_PATH_PATTERN.search(tool_content)
             if not match:
