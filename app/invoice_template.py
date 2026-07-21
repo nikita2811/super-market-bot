@@ -5,6 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+import os
 
 
 _INDIAN_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
@@ -154,3 +155,5 @@ def render_gst_invoice(output_path: str, invoice_data: dict) -> None:
     story.append(Paragraph("This is a computer-generated invoice.", styles["Small"]))
 
     doc.build(story)
+    print(f"PDF exists: {os.path.exists(output_path)}")
+    print(f"PDF size: {os.path.getsize(output_path) if os.path.exists(output_path) else 0}")
