@@ -3,9 +3,11 @@ from langchain_core.tools import tool
 from app.db import SessionLocal
 from app.model import Bill, BillStatus, Product, Preference
 from app.invoice_template import render_gst_invoice
+import logging
 
 INVOICE_OUTPUT_DIR = os.environ.get("INVOICE_OUTPUT_DIR", "/tmp/invoices")
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("super-market-bot")
 
 @tool
 def generate_invoice_pdf(bill_id: str) -> str:
@@ -84,6 +86,8 @@ def generate_invoice_pdf(bill_id: str) -> str:
         os.makedirs(INVOICE_OUTPUT_DIR, exist_ok=True)
         output_path = os.path.join(INVOICE_OUTPUT_DIR, f"invoice_{bill.id}.pdf")
         render_gst_invoice(output_path, invoice_data)
+        logger.info(f"Saved to: {output_path}")
+        logger.info(f"Exists immediately after save: {os.path.exists(output_path)}")
 
         return f"Invoice generated. FILE_PATH: {output_path}"
     finally:
