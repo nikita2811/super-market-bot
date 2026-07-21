@@ -51,7 +51,7 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
     else:
         reply_text = content or "Sorry, I couldn't process that."
     
-    file_path = None
+     file_path = None
     for msg in all_messages:
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
@@ -61,5 +61,5 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
                 file_path = match.group(1)
 
 
-    return {"text": reply_text, "file_paths": file_path}
+    return {"text": reply_text, "file_path": file_path}
     
