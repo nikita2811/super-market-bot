@@ -1,8 +1,10 @@
 import re
-
+import logging
 
 FILE_PRODUCING_TOOLS = {"generate_invoice_pdf", "generate_report_pptx"}
 FILE_PATH_PATTERN = re.compile(r"FILE_PATH:\s*(\S+)")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("super-market-bot")
 
 
 async def handle_telegram_message(request, chat_id: str, text: str,update_id: str) -> dict:
@@ -38,5 +40,6 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
             match = FILE_PATH_PATTERN.search(tool_content)
             if match:
                 file_path = match.group(1)
-
+      
+    logger.info(f"file_path:{file_path}")
     return {"text": reply_text, "file_path": file_path}
