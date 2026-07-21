@@ -41,5 +41,6 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
             if match:
                 file_path = match.group(1)
       
-    logger.info(f"file_path:{file_path}")
+    
+    logger.info(f"file_path={repr(file_path)}")
     return {"text": reply_text, "file_path": file_path}
