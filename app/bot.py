@@ -33,7 +33,7 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
 
 
     file_path = None
-    for msg in messages:
+    for msg in reversed(messages):
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
             tool_content = msg.content if isinstance(msg.content, str) else str(msg.content)
