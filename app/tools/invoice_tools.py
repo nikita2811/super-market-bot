@@ -14,7 +14,7 @@ def generate_invoice_pdf(bill_id: str) -> str:
     The returned file path is for the APPLICATION to read and attach as a
     Telegram document automatically — you do not need to do anything with it,
     and should NOT repeat the file path in your reply to the owner. Just
-    acknowledge naturally, e.g. "Invoice generated — sending it now.""""
+    acknowledge naturally, e.g. "Invoice generated — sending it now."""
     db = SessionLocal()
     try:
         bill = db.query(Bill).filter(Bill.id == bill_id).first()
