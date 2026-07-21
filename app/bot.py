@@ -1,9 +1,4 @@
 import re
-import os
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("super-market-bot")
 
 
 FILE_PRODUCING_TOOLS = {"generate_invoice_pdf", "generate_report_pptx"}
@@ -35,20 +30,13 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
         reply_text = content or "Sorry, I couldn't process that."
 
 
-    file_paths = []
+    file_path = None
     for msg in messages:
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
-            logger.info(f"tool_name:{tool_name}")
             tool_content = msg.content if isinstance(msg.content, str) else str(msg.content)
             match = FILE_PATH_PATTERN.search(tool_content)
-            if not match:
-                continue
-            path = match.group(1)
-            if os.path.exists(path):
-                file_paths.append(path)
-            else:
-                logger.error(f"Tool {msg.name} reported a path that doesn't exist: {path}")
+            if match:
+                file_path = match.group(1)
 
-
-    return {"text": reply_text, "file_path": file_paths}
+    return {"text": reply_text, "file_path": file_path}
