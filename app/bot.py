@@ -35,6 +35,8 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
     logger.info(f"agent turn took {t1 - t0:.2f}s for chat {chat_id}")
     all_messages = result["messages"]
     new_messages = all_messages[prior_count:]  
+    logger.info(f"all messages:{all_messages}")
+    logger.info(f"new_messages:{new_messages}")
 
     content = all_messages[-1].content
     if isinstance(content, list):
@@ -54,8 +56,9 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
     else:
         reply_text = content or "Sorry, I couldn't process that."
     
-    file_path = []
+    file_path = None
     for msg in new_messages:
+        logger.info(f"msg type={type(msg).__name__} name={getattr(msg, 'name', None)!r} content={msg.content!r}")
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
             tool_content = msg.content if isinstance(msg.content, str) else str(msg.content)
