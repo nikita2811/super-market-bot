@@ -214,7 +214,7 @@ def generate_report_pptx(start: str, end: str) -> str:
     GST-collected-by-slab chart, and a key-insights summary slide. Dates are
     format YYYY-MM-DD, inclusive. Use this whenever the owner asks for a
     sales analysis deck, a weekly/monthly report, or similar — e.g. "make
-    this week's sales analysis deck". Returns the file path of the generated
+    this week's sales analysis deck". Returns generated
     .pptx so it can be sent to the owner (e.g. via Telegram sendDocument).
     Reads the same closed/live day data as get_sales_range, so the numbers
     in the deck always match what get_daily_summary and get_sales_range
