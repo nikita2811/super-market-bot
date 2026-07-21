@@ -40,6 +40,7 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
             match = FILE_PATH_PATTERN.search(tool_content)
             if match:
                 file_path = match.group(1)
+                break
       
     
     logger.info(f"file_path={repr(file_path)}")
