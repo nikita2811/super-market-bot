@@ -4,7 +4,7 @@ from langchain_core.runnables import RunnableConfig
 from sqlalchemy.exc import IntegrityError
 from app.db import SessionLocal
 from app.model import Customer, AccountTransaction, AccountType, gen_id
-from app.tools.guardrails import check_khata_settlement_is_valid
+from app.tools.guardrails import check_account_settlement_is_valid
 
 
 @tool
@@ -111,7 +111,7 @@ def record_payment(customer_id: str, amount: float, *, config: RunnableConfig) -
         if amount <= 0:
             return "Payment amount must be greater than zero"
         
-        settlement_check = check_khata_settlement_is_valid(db, customer_id, amount)
+        settlement_check = check_account_settlement_is_valid(db, customer_id, amount)
         if not settlement_check.allowed:
             return settlement_check.message
 
