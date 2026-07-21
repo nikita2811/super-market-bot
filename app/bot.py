@@ -35,7 +35,7 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
         reply_text = content or "Sorry, I couldn't process that."
 
 
-    file_path = None
+    file_paths = []
     for msg in messages:
         tool_name = getattr(msg, "name", None)
         if tool_name in FILE_PRODUCING_TOOLS:
@@ -46,9 +46,9 @@ async def handle_telegram_message(request, chat_id: str, text: str,update_id: st
                 continue
             path = match.group(1)
             if os.path.exists(path):
-                file_path.append(path)
+                file_paths.append(path)
             else:
                 logger.error(f"Tool {msg.name} reported a path that doesn't exist: {path}")
 
 
-    return {"text": reply_text, "file_path": file_path}
+    return {"text": reply_text, "file_path": file_paths}
