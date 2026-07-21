@@ -7,7 +7,7 @@ FILE_PATH_PATTERN = re.compile(r"FILE_PATH:\s*(\S+)")
 
 async def handle_telegram_message(request, chat_id: str, text: str,update_id: str) -> dict:
     agent = request.app.state.agent
-    result = await agent.invoke(
+    result = agent.invoke(
         {"messages": [{"role": "user", "content": text}]},
         config={
             "configurable": {
