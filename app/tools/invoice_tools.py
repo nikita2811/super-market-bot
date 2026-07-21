@@ -10,9 +10,11 @@ INVOICE_OUTPUT_DIR = os.environ.get("INVOICE_OUTPUT_DIR", "/tmp/invoices")
 @tool
 def generate_invoice_pdf(bill_id: str) -> str:
     """Generate a GST-correct tax invoice PDF for a bill. Only works on
-    finalized (or voided) bills — a draft has no locked totals to invoice yet.
-    Returns the generated PDF so it can be sent to the owner
-    (e.g. via Telegram sendDocument)."""
+    finalized (or cancelled) bills — a draft has no locked totals to invoice yet.
+    The returned file path is for the APPLICATION to read and attach as a
+    Telegram document automatically — you do not need to do anything with it,
+    and should NOT repeat the file path in your reply to the owner. Just
+    acknowledge naturally, e.g. "Invoice generated — sending it now.""""
     db = SessionLocal()
     try:
         bill = db.query(Bill).filter(Bill.id == bill_id).first()

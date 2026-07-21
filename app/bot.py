@@ -1,6 +1,8 @@
 import re
 import os
 import logging
+import time
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("super-market-bot")
@@ -11,6 +13,7 @@ FILE_PATH_PATTERN = re.compile(r"FILE_PATH:\s*(\S+)")
 
 
 async def handle_telegram_message(request, chat_id: str, text: str, update_id: str) -> dict:
+    t0 = time.monotonic()
     agent = request.app.state.agent
     config = {
         "configurable": {
@@ -20,15 +23,15 @@ async def handle_telegram_message(request, chat_id: str, text: str, update_id: s
         }
     }
 
-    # Snapshot how many messages exist BEFORE this turn, so we can isolate only
-    # what THIS invoke adds — result["messages"] otherwise returns the entire
-    # thread history, which is why old tool outputs kept resurfacing forever.
+  
     prior_state = agent.get_state(config)
     prior_count = len(prior_state.values.get("messages", [])) if prior_state.values else 0
 
-    result = agent.invoke({"messages": [{"role": "user", "content": text}]}, config=config)
+    result = await asyncio.to_thread( agent.invoke({"messages": [{"role": "user", "content": text}]}), config=config)
+    t1 = time.monotonic()
+    logger.info(f"agent turn took {t1 - t0:.2f}s for chat {chat_id}")
     all_messages = result["messages"]
-    new_messages = all_messages[prior_count:]  # ONLY what this turn produced
+    new_messages = all_messages[prior_count:]  
 
     content = all_messages[-1].content
     if isinstance(content, list):
