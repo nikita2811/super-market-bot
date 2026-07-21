@@ -21,6 +21,33 @@ HSN_SUGGESTIONS = {
     ("dal", 0): "0713",
 }
 
+STAPLE_KEYWORDS = {
+    "atta", "wheat", "rice", "chawal", "dal", "besan", "suji", "rava", "poha",
+    "jowar", "bajra", "maida", "salt", "namak",
+}
+
+ 
+def _check_gst_slab_plausible(name: str, is_loose: bool, gst_slab: float) -> str | None:
+    """SOFT guardrail for the one remaining ambiguous direction: a packaged/
+    branded staple marked GST-exempt (0%). This is a nudge, not an authoritative
+    ruling — real GST-exempt packaged items exist depending on notification, so
+    the owner can confirm past it with force=True. The other direction (loose
+    item with nonzero GST) is no longer a warning — see the hard override in
+    create_product/update_product below: loose items are always forced to 0%,
+    since that's this store's policy, not a judgment call."""
+    if is_loose:
+        return None  # handled by the hard override, not this check
+    name_lower = name.lower()
+    if not any(keyword in name_lower for keyword in STAPLE_KEYWORDS):
+        return None
+    if gst_slab == 0:
+        return (
+            f"'{name}' is marked packaged/branded with GST 0% — packaged, branded "
+            f"staples are usually taxed (commonly 5%) even when the loose version "
+            f"of the same item is exempt. Confirm this is intentional."
+        )
+    return None
+
 def _sku_slug(name: str) -> str:
     """Generate a readable SKU from a product name, e.g. 'Amul Butter 100g' -> 'AMUL-BUTTER-100G'."""
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", name.strip()).strip("-").upper()
@@ -58,6 +85,7 @@ def create_product(
     gst_slab: float,
     reorder_level: float,
     initial_qty: float = 0,
+    force: bool = False,
 ) -> str:
     """Add a BRAND NEW product to the catalog that has never existed before.
     Do NOT use this to add stock of an existing product — use receive_stock for that.
@@ -75,7 +103,11 @@ def create_product(
 
         if gst_slab not in VALID_GST_SLABS:
             return f"Invalid GST slab {gst_slab}%. Must be one of: {sorted(VALID_GST_SLABS)}"
-
+        
+        gst_warning = _check_gst_slab_plausible(name, is_loose, gst_slab)
+        if gst_warning and not force:
+            return gst_warning + " Call again with force=True to confirm."
+        
         if cost_price <= 0 or sell_price <= 0:
             return "Cost price and sell price must both be greater than zero"
 
@@ -197,6 +229,8 @@ def update_product(
     gst_slab: float | None = None,
     hsn_code: str | None = None,
     reorder_level: float | None = None,
+    is_loose: bool | None = None,
+    force: bool = False,
 ) -> str:
     """Edit fields on an EXISTING product identified by SKU — e.g. change its price,
     GST slab, or reorder level. Only pass the fields that are actually changing;
@@ -218,6 +252,18 @@ def update_product(
             if gst_slab not in VALID_GST_SLABS:
                 return f"Invalid GST slab {gst_slab}%. Must be one of: {sorted(VALID_GST_SLABS)}"
             product.gst_slab = gst_slab
+
+        resulting_name = name if name is not None else product.name
+        resulting_is_loose = is_loose if is_loose is not None else bool(product.is_loose)
+        resulting_gst_slab = gst_slab if gst_slab is not None else float(product.gst_slab)
+        gst_warning = _check_gst_slab_plausible(resulting_name, resulting_is_loose, resulting_gst_slab)
+        if gst_warning and not force:
+            return gst_warning + " Call again with force=True to confirm."
+
+        if gst_slab is not None:
+            product.gst_slab = gst_slab
+        if is_loose is not None:
+            product.is_loose = 1 if is_loose else 0
 
         if cost_price is not None:
             if cost_price <= 0:
