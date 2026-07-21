@@ -93,7 +93,7 @@ def _get_or_create_shop_row(db) -> Preference:
 @tool
 def set_shop_details(
     shop_name: str | None = None,
-    phone: str | None = None,
+    phone: int | None = None,
     gstin: str | None = None,
     address: str | None = None,
 ) -> str:
@@ -112,7 +112,7 @@ def set_shop_details(
             row.shop_name = shop_name
             updated.append("shop_name")
         if phone is not None:
-            row.phone = phone
+            row.phone = int(phone)
             updated.append("phone")
         if gstin is not None:
             row.gstin = gstin

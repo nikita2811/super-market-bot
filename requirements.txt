@@ -9,7 +9,6 @@ python-pptx>=1.0.2
 matplotlib>=3.9.2
 alembic
 deepagents
-langchain-google-genai
 reportlab
 langgraph-checkpoint-postgres
 psycopg[binary]

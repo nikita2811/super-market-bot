@@ -65,7 +65,7 @@ def check_stock_change_is_legitimate(reason, delta: float, current_qty_on_hand: 
 
 
 
-def check_khata_settlement_is_valid(db, customer_id: str, amount: float) -> GuardrailResult:
+def check_account_settlement_is_valid(db, customer_id: str, amount: float) -> GuardrailResult:
     """Refuse settling a khata (credit account) if the customer doesn't exist, has
     no outstanding balance, or the settlement amount exceeds what's actually owed.
     """
@@ -77,7 +77,7 @@ def check_khata_settlement_is_valid(db, customer_id: str, amount: float) -> Guar
             f"No customer found for id '{customer_id}' — can't settle a khata that doesn't exist."
         )
 
-    outstanding = float(getattr(customer, "khata_balance", 0) or 0)
+    outstanding = float(getattr(customer, "account_balance", 0) or 0)
     name = getattr(customer, "name", customer_id)
 
     if outstanding <= 0:

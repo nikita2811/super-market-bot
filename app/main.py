@@ -10,18 +10,23 @@ from app.agent import init_checkpointer,build_agent
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.khata_reminders import send_khata_reminders
+from app.deck_scheduler import start_scheduler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("super-market-bot")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(send_khata_reminders, "cron", hour=10, args=[send_telegram_message])
+    scheduler.add_job(send_khata_reminders, "cron", hour=10)
     scheduler.start()
+
+    weekly_deck_scheduler = start_scheduler()
     with init_checkpointer() as checkpointer:
         app.state.agent = build_agent(checkpointer)
         yield
-
+    weekly_deck_scheduler.shutdown()
+    scheduler.shutdown()
+    
 app = FastAPI(lifespan=lifespan)
 
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_BOT_TOKEN}"
@@ -118,9 +123,9 @@ async def transcribe_voice_note(http_client: httpx.AsyncClient, audio_bytes: byt
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
-async def _process_and_reply(request:Request,chat_id: str, text: str, http_client: httpx.AsyncClient):
+async def _process_and_reply(request:Request,chat_id: str, text: str,update_id:str, http_client: httpx.AsyncClient):
     """Run the agent on `text` and send back whatever it produces (message + optional file)."""
-    result = await handle_telegram_message(request,chat_id, text)
+    result = await handle_telegram_message(request,chat_id, text,update_id)
 
     if isinstance(result, dict):
         reply_text = result.get("text", "")
@@ -178,7 +183,7 @@ async def telegram_webhook(
         if "text" in message:
             text = message["text"]
             logger.info(f"Message from {chat_id}: {text}")
-            await _process_and_reply(request,chat_id, text, http_client)
+            await _process_and_reply(request,chat_id, text,update_id, http_client)
 
         elif "voice" in message:
             logger.info(f"Voice note from {chat_id}")
@@ -200,6 +205,6 @@ async def telegram_webhook(
                 await send_telegram_message(http_client, chat_id, "I couldn't make out anything in that voice note.")
                 return {"ok": True}
 
-            await _process_and_reply(request,chat_id, transcript, http_client)
+            await _process_and_reply(request,chat_id, transcript,update_id, http_client)
 
     return {"ok": True}

@@ -3,7 +3,7 @@ from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 from langchain_core.tools import tool
 from app.db import SessionLocal
-from app.model import Bill, BillItem, BillStatus, DailyClosure
+from app.model import Bill, BillItem, BillStatus, DailyClosure,gen_id
 from sqlalchemy.exc import IntegrityError
 
 
@@ -163,7 +163,7 @@ def close_day(date: str | None = None, force: bool = False) -> str:
         data = _compute_live_day(db, target_date)
 
         closure = DailyClosure(
-            id=None,  
+            id=gen_id,  
             closure_date=target_date,
             total_sales=float(data["total_sales"]),
             total_tax=float(data["total_tax"]),

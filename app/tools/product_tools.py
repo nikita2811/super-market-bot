@@ -49,7 +49,6 @@ def suggest_hsn(product_name: str, gst_slab: float) -> str:
 
 @tool
 def create_product(
-    sku: str,
     name: str,
     unit: str,
     is_loose: bool,

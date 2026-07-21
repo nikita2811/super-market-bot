@@ -63,7 +63,8 @@ class Customer(Base):
     id = Column(String, primary_key=True, default=gen_id)
     name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
-    account_balance = Column(Numeric(10, 2), nullable=False, default=0)  # cached rollup
+    account_balance = Column(Numeric(10, 2), nullable=False, default=0)
+    chat_id= Column(String,nullable=True)  # cached rollup
 
 
 class AccountTransaction(Base):
@@ -73,6 +74,7 @@ class AccountTransaction(Base):
     type = Column(Enum(AccountType), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)              # always positive
     ref_bill_id = Column(String, nullable=True)
+    idempotency_key = Column(String, unique=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

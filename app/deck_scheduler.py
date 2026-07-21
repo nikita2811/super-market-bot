@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.db import SessionLocal
 from app.model import ChatSession
-from app.tools.deck_tools import generate_report_pptx
+from app.tools.analytics_document import generate_report_pptx
 
 logger = logging.getLogger("super-market-bot.scheduler")
 

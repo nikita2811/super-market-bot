@@ -5,14 +5,15 @@ FILE_PRODUCING_TOOLS = {"generate_invoice_pdf", "generate_report_pptx"}
 FILE_PATH_PATTERN = re.compile(r"FILE_PATH:\s*(\S+)")
 
 
-async def handle_telegram_message(request, chat_id: str, text: str) -> dict:
+async def handle_telegram_message(request, chat_id: str, text: str,update_id: str) -> dict:
     agent = request.app.state.agent
-    result = agent.invoke(
+    result = await agent.invoke(
         {"messages": [{"role": "user", "content": text}]},
         config={
             "configurable": {
                 "chat_id": chat_id,
                 "thread_id": chat_id,
+                "update_id":update_id
             }
         },
     )
